@@ -2,31 +2,30 @@ package se325.assignment01.concert.service.services;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import se325.assignment01.concert.common.dto.ConcertDTO;
-import se325.assignment01.concert.common.dto.ConcertSummaryDTO;
-import se325.assignment01.concert.common.dto.PerformerDTO;
-import se325.assignment01.concert.common.dto.UserDTO;
-import se325.assignment01.concert.service.domain.Concert;
-import se325.assignment01.concert.service.domain.Performer;
-import se325.assignment01.concert.service.domain.User;
+import se325.assignment01.concert.common.dto.*;
+import se325.assignment01.concert.common.types.BookingStatus;
+import se325.assignment01.concert.service.domain.*;
 import se325.assignment01.concert.service.jaxrs.LocalDateTimeParam;
 import se325.assignment01.concert.service.mapper.ConcertMapper;
 import se325.assignment01.concert.service.mapper.PerformerMapper;
+import se325.assignment01.concert.service.mapper.SeatMapper;
 
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Path("/concert-service")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
 public class ConcertResource {
     private static Logger LOGGER = LoggerFactory.getLogger(ConcertResource.class);
 
     @GET
     @Path("/concerts/{id}")
-    @Produces(MediaType.APPLICATION_JSON)
     public Response getConcertById(@PathParam("id") Long id) {
         LOGGER.info("Receiving a concert with id " + id);
         EntityManager em = PersistenceManager.instance().createEntityManager();
@@ -50,7 +49,6 @@ public class ConcertResource {
 
     @GET
     @Path("/concerts")
-    @Produces(MediaType.APPLICATION_JSON)
     public Response getAllConcerts() {
         LOGGER.info("Getting all concerts.");
         EntityManager em = PersistenceManager.instance().createEntityManager();
@@ -70,7 +68,6 @@ public class ConcertResource {
 
     @GET
     @Path("/concerts/summaries")
-    @Produces(MediaType.APPLICATION_JSON)
     public Response getConcertSummaries() {
         LOGGER.info("Getting the concert summaries.");
         EntityManager em = PersistenceManager.instance().createEntityManager();
@@ -89,7 +86,6 @@ public class ConcertResource {
 
     @GET
     @Path("/performers/{id}")
-    @Produces(MediaType.APPLICATION_JSON)
     public Response getPerformerById(@PathParam("id") Long id) {
         LOGGER.info("Getting a performer of id " + id);
 
@@ -114,7 +110,6 @@ public class ConcertResource {
 
     @GET
     @Path("/performers")
-    @Produces(MediaType.APPLICATION_JSON)
     public Response getAllPerformers() {
         LOGGER.info("Getting all performers.");
         EntityManager em = PersistenceManager.instance().createEntityManager();
@@ -163,17 +158,30 @@ public class ConcertResource {
 
     @GET
     @Path("/seats/{date}")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getSeatsForDate(@PathParam("date") LocalDateTimeParam date, @QueryParam("status") String status) {
-        LOGGER.info("Get the seats of date " + date + "with status:" + status);
+    public Response getSeats(@PathParam("date") LocalDateTimeParam dateTimeParam, @QueryParam("status") BookingStatus status) {
         EntityManager em = PersistenceManager.instance().createEntityManager();
         try {
             em.getTransaction().begin();
+            LocalDateTime  date = dateTimeParam.getLocalDateTime();
+            List<Seat> seats;
 
-            return null;
+            if(status == null || status == BookingStatus.Any) { //All seats for that date
+                seats = em.createQuery("select seat from Seat seat where seat.date = :date",Seat.class)
+                        .setParameter("date", date)
+                        .getResultList();
+            } else {
+                boolean isBooked = (status == BookingStatus.Booked);
+                seats = em.createQuery("select seat from Seat seat where seat.date = :date AND seat.isBooked = :isBooked ",Seat.class)
+                        .setParameter("date", date)
+                        .setParameter("isBooked", isBooked)
+                        .getResultList();
+            }
+
+            List<SeatDTO> seatDTOList = SeatMapper.listToDTO(seats);
+            GenericEntity<List<SeatDTO>> entity = new GenericEntity<>(seatDTOList) {};
+            return Response.ok(entity).build();
         } finally {
             em.close();
         }
     }
-
 }
