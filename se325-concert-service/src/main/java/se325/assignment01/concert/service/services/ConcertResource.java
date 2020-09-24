@@ -10,15 +10,20 @@ import se325.assignment01.concert.service.mapper.BookingMapper;
 import se325.assignment01.concert.service.mapper.ConcertMapper;
 import se325.assignment01.concert.service.mapper.PerformerMapper;
 import se325.assignment01.concert.service.mapper.SeatMapper;
+import se325.assignment01.concert.service.util.Subscription;
+import se325.assignment01.concert.service.util.TheatreLayout;
 
 import javax.persistence.EntityManager;
+import javax.persistence.PostLoad;
 import javax.persistence.TypedQuery;
 import javax.ws.rs.*;
+import javax.ws.rs.container.AsyncResponse;
+import javax.ws.rs.container.Suspended;
 import javax.ws.rs.core.*;
 import java.net.URI;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Path("/concert-service")
 @Produces(MediaType.APPLICATION_JSON)
@@ -26,6 +31,7 @@ import java.util.UUID;
 public class ConcertResource {
     private static Logger LOGGER = LoggerFactory.getLogger(ConcertResource.class);
     public static final String AUTH_COOKIE = "auth";
+    private static final Map<Long, List<Subscription>> subscribersMap = new HashMap<>();
 
     @GET
     @Path("/concerts/{id}")
@@ -173,15 +179,12 @@ public class ConcertResource {
 
         try {
             em.getTransaction().begin();
-            TypedQuery<User> userQuery = em.createQuery("select u from User u where u.cookie = :cookie", User.class)
-                    .setParameter("cookie", cookie.getValue());
-            User user = userQuery.getResultList().stream().findFirst().orElse(null); //gets a single user
+            User user = this.getAuthenticatedUser(em, cookie);
 
-            if (user == null) { //Havn't sign up
+            if (user == null) { //Haven't sign up
                 return Response.status(Response.Status.UNAUTHORIZED).build();
             }
 
-            LOGGER.info("Login successful");
 
             Concert concert = em.find(Concert.class, dto.getConcertId());
 
@@ -208,15 +211,21 @@ public class ConcertResource {
                 seat.setBooked(true);
             }
 
+            //Get all the booked seats
+            List<Seat> seatsList = em.createQuery("select s from Seat s where s.date = :requestDate and s.isBooked = true ", Seat.class)
+                    .setParameter("requestDate", dto.getDate()).getResultList();
+
+            int numOfBookedSeats = seatsList.size();
+
             newBooking = new Booking(dto.getConcertId(), dto.getDate(), seats, user);
             em.persist(newBooking);
             em.getTransaction().commit();
 
+            this.notifyConcertInfo(dto.getConcertId(), numOfBookedSeats, dto.getDate());
+            return Response.created(URI.create("concert-service/bookings/"+ newBooking.getId())).cookie(new NewCookie(AUTH_COOKIE, cookie.getValue())).build();
         } finally {
             em.close();
         }
-
-        return Response.created(URI.create("concert-service/bookings/"+ newBooking.getId())).cookie(new NewCookie(AUTH_COOKIE, cookie.getValue())).build();
     }
 
     @GET
@@ -231,16 +240,11 @@ public class ConcertResource {
         try {
             em.getTransaction().begin();
 
-            TypedQuery<User> userQuery = em.createQuery("select u from User u where u.cookie = :cookie", User.class)
-                    .setParameter("cookie", cookie.getValue());
+            User user = this.getAuthenticatedUser(em, cookie);
 
-            List<User> users = userQuery.getResultList();
-
-            if (users == null) { //Haven't sign up
+            if (user == null) { //Haven't sign up
                 return Response.status(Response.Status.UNAUTHORIZED).build();
             }
-            LOGGER.info("Login successful");
-            User user = users.get(0);
 
             Booking booking = em.find(Booking.class, id);
 
@@ -272,20 +276,13 @@ public class ConcertResource {
 
         EntityManager em = PersistenceManager.instance().createEntityManager();
         try {
-
             em.getTransaction().begin();
 
-            TypedQuery<User> userQuery = em.createQuery("select u from User u where u.cookie = :cookie", User.class)
-                    .setParameter("cookie", cookie.getValue());
+            User user = this.getAuthenticatedUser(em, cookie);
 
-            List<User> users = userQuery.getResultList();
-
-            if (users == null) { //Haven't sign up
+            if (user == null) { //Haven't sign up
                 return Response.status(Response.Status.UNAUTHORIZED).build();
             }
-
-            LOGGER.info("Login successful");
-            User user = users.get(0);
 
             List<Booking> bookings = em.createQuery("select b from Booking b where b.user = :user", Booking.class)
                     .setParameter("user", user).getResultList();
@@ -328,4 +325,88 @@ public class ConcertResource {
             em.close();
         }
     }
+
+    @POST
+    @Path("/subscribe/concertInfo")
+    public void subscriptConcertInfo(@CookieParam("auth") Cookie cookie, ConcertInfoSubscriptionDTO dto, @Suspended AsyncResponse response) {
+        LOGGER.info("Attempting to subscribe");
+
+        if(cookie == null) {
+            response.resume(Response.status(Response.Status.UNAUTHORIZED).build());
+            return;
+        }
+
+        EntityManager em = PersistenceManager.instance().createEntityManager();
+        try {
+            em.getTransaction().begin();
+            User user = this.getAuthenticatedUser(em, cookie);
+
+            if (user == null) {
+                response.resume(Response.status(Response.Status.UNAUTHORIZED).build());
+                return;
+            }
+
+            Concert concert = em.find(Concert.class, dto.getConcertId());
+
+            if (concert == null) { // No concert
+                response.resume(Response.status(Response.Status.BAD_REQUEST).build());
+                return;
+            }
+
+            if (!concert.getDates().contains(dto.getDate())) { //The date is wrong
+                response.resume(Response.status(Response.Status.BAD_REQUEST).build());
+                return;
+            }
+
+            List<Subscription> subscribers = subscribersMap.getOrDefault(concert.getId(), new ArrayList<>());
+            subscribers.add(new Subscription(dto, response));
+            subscribersMap.put(concert.getId(),subscribers);
+        } finally {
+            em.close();
+        }
+    }
+
+
+    @POST
+    public void notifyConcertInfo (Long concertID, int numOfBookedSeats, LocalDateTime date) {
+        List<Subscription> subs = subscribersMap.get(concertID);
+
+        if(subs != null) {
+            List<Subscription> subs2 = new ArrayList<>();
+            for(Subscription sub:subs) {
+                if((sub.getDto().getDate().equals(date))
+                        && (sub.getDto().getPercentageBooked() < (100 * numOfBookedSeats/ TheatreLayout.NUM_SEATS_IN_THEATRE))) {
+                        AsyncResponse response = sub.getResponse();
+                        int numOfAvaliableSeats = TheatreLayout.NUM_SEATS_IN_THEATRE - numOfBookedSeats;
+
+                        synchronized (response) {
+                            ConcertInfoNotificationDTO notification = new ConcertInfoNotificationDTO(numOfAvaliableSeats);
+                            response.resume(Response.ok(notification).build());
+                        }
+                } else {
+                    subs2.add(sub);
+                }
+            }
+            subscribersMap.put(concertID, subs2);
+        }
+
+    }
+
+
+    //===========HELP METHODS =========
+    public User getAuthenticatedUser(EntityManager em, Cookie cookie) {
+        TypedQuery<User> userQuery = em.createQuery("select u from User u where u.cookie = :cookie", User.class)
+                .setParameter("cookie", cookie.getValue());
+
+        List<User> users = userQuery.getResultList();
+
+        if (users == null) { //Haven't sign up
+           return null;
+        }
+
+        LOGGER.info("Login successful");
+        User user = users.get(0);
+        return user;
+    }
+
 }
