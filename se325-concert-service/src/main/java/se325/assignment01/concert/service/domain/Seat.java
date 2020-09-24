@@ -13,10 +13,7 @@ public class Seat {
 	private String label;
 	private boolean isBooked;
 	private LocalDateTime date;
-	private BigDecimal price;
-
-	@Version
-	private long version;
+	private BigDecimal price;w
 	
 	public Seat() {}
 
