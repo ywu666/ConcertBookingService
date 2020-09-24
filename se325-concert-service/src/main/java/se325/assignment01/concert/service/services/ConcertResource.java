@@ -14,7 +14,6 @@ import se325.assignment01.concert.service.util.Subscription;
 import se325.assignment01.concert.service.util.TheatreLayout;
 
 import javax.persistence.EntityManager;
-import javax.persistence.PostLoad;
 import javax.persistence.TypedQuery;
 import javax.ws.rs.*;
 import javax.ws.rs.container.AsyncResponse;
@@ -23,7 +22,6 @@ import javax.ws.rs.core.*;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Path("/concert-service")
 @Produces(MediaType.APPLICATION_JSON)

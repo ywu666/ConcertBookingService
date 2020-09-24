@@ -1,7 +1,6 @@
 package se325.assignment01.concert.service.domain;
 
 import java.util.Set;
-
 import javax.persistence.*;
 
 import org.apache.commons.lang3.builder.EqualsBuilder;

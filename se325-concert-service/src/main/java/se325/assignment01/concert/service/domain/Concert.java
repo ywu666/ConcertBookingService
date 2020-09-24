@@ -1,18 +1,12 @@
 package se325.assignment01.concert.service.domain;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 import javax.persistence.*;
-
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
-import se325.assignment01.concert.common.jackson.LocalDateTimeDeserializer;
-import se325.assignment01.concert.common.jackson.LocalDateTimeSerializer;
 
 
 @Entity
@@ -45,11 +39,11 @@ public class Concert {
             joinColumns = @JoinColumn(name="CONCERT_ID", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "PERFORMER_ID", referencedColumnName = "id"))
     @Column(name="PERFORMER")
-    private Set<Performer> performers;
+    private List<Performer> performers;
 
     public Concert(){}
 
-    public Concert(Long id, String title, String imageName, String blurb,Set<Performer> performers){
+    public Concert(Long id, String title, String imageName, String blurb, List<Performer> performers){
         this.id = id;
         this.title = title;
         this.imageName = imageName;
@@ -97,11 +91,11 @@ public class Concert {
         this.dates = dates;
     }
 
-    public Set<Performer> getPerformers() {
+    public List<Performer> getPerformers() {
         return performers;
     }
 
-    public void setPerformers(Set<Performer> performers) {
+    public void setPerformers(List<Performer> performers) {
         this.performers = performers;
     }
 

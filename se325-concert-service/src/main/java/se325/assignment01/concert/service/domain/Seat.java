@@ -3,7 +3,6 @@ package se325.assignment01.concert.service.domain;
 import javax.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Objects;
 
 @Entity
 public class Seat {
@@ -13,7 +12,7 @@ public class Seat {
 	private String label;
 	private boolean isBooked;
 	private LocalDateTime date;
-	private BigDecimal price;w
+	private BigDecimal price;
 	
 	public Seat() {}
 

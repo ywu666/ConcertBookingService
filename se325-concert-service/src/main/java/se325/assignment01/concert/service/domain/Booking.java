@@ -1,13 +1,7 @@
 package se325.assignment01.concert.service.domain;
 
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import se325.assignment01.concert.common.jackson.LocalDateTimeDeserializer;
-import se325.assignment01.concert.common.jackson.LocalDateTimeSerializer;
-
 import javax.persistence.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 
