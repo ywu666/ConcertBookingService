@@ -15,6 +15,9 @@ public class Seat {
 	private LocalDateTime date;
 	private BigDecimal price;
 
+	@Version
+	private long version;
+	
 	public Seat() {}
 
 	public Seat(String label, boolean isBooked, LocalDateTime date, BigDecimal price) {
