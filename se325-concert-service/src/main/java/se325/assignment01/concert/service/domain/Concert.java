@@ -100,21 +100,16 @@ public class Concert {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof Concert))
-            return false;
-        if (obj == this)
-            return true;
+        if (!(obj instanceof Concert)) return false;
+        if (obj == this) return true;
 
-        Concert rhs = (Concert) obj;
+        Concert concert = (Concert) obj;
 
-        return new EqualsBuilder().
-                append(title, rhs.title).
-                isEquals();
+        return new EqualsBuilder().append(title, concert.title).isEquals();
     }
 
     @Override
     public int hashCode() {
-        return new HashCodeBuilder(17, 31).
-                append(title).hashCode();
+        return new HashCodeBuilder(17, 31).append(title).hashCode();
     }
 }

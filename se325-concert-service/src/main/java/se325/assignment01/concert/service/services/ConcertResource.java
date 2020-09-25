@@ -29,7 +29,6 @@ import java.util.*;
 @Consumes(MediaType.APPLICATION_JSON)
 public class ConcertResource {
     private static Logger LOGGER = LoggerFactory.getLogger(ConcertResource.class);
-    public static final String AUTH_COOKIE = "auth";
     private static final Map<Long, List<Subscription>> subscribersMap = new HashMap<>();
 
     @GET
@@ -152,7 +151,7 @@ public class ConcertResource {
     @POST
     @Path("/login")
     public Response login(UserDTO userDTO) {
-        LOGGER.info("Try to log in with username ans password.");
+        LOGGER.info("Try to log in with username ans password. " + userDTO.getUsername());
         EntityManager em = PersistenceManager.instance().createEntityManager();
 
         try {
@@ -183,7 +182,7 @@ public class ConcertResource {
 
     @POST
     @Path("/bookings")
-    public Response makeABooking(BookingRequestDTO dto, @CookieParam(AUTH_COOKIE) Cookie cookie) {
+    public Response makeABooking(BookingRequestDTO dto, @CookieParam("auth") Cookie cookie) {
         LOGGER.info("Try to make a booing of concert" + dto.getConcertId() + "on Date" + dto.getDate());
 
         if (cookie == null) { //Haven't login
@@ -238,9 +237,9 @@ public class ConcertResource {
 
             em.getTransaction().commit();
 
-            this.notifyConcertInfo(dto.getConcertId(), numOfBookedSeats, dto.getDate());
+            this.notifyConcertInfo(dto, numOfBookedSeats);
             return Response.created(URI.create("concert-service/bookings/" + newBooking.getId()))
-                    .cookie(new NewCookie(AUTH_COOKIE, cookie.getValue())).build();
+                    .cookie(new NewCookie("auth", cookie.getValue())).build();
         } finally {
             em.close();
         }
@@ -248,7 +247,7 @@ public class ConcertResource {
 
     @GET
     @Path("/bookings/{id}")
-    public Response getOwnBookingById(@PathParam("id") Long id, @CookieParam(AUTH_COOKIE) Cookie cookie){
+    public Response getOwnBookingById(@PathParam("id") Long id, @CookieParam("auth") Cookie cookie){
 
         if (cookie == null) { //Haven't login
             LOGGER.debug("Didn't provide the cookie");
@@ -281,17 +280,16 @@ public class ConcertResource {
             em.getTransaction().commit();
 
             return Response.ok(BookingMapper.toDTO(booking))
-                    .cookie(new NewCookie(AUTH_COOKIE, cookie.getValue())).build();
+                    .cookie(new NewCookie("auth", cookie.getValue())).build();
         } finally {
             em.close();
         }
-
     }
 
     @GET
     @Path("/bookings")
     public Response getAllBookingsForUser(@CookieParam("auth") Cookie cookie) {
-        LOGGER.info("Get all the bookings for user");
+        LOGGER.info("Get all the bookings for auth user");
 
         if (cookie == null) { //User hasn't login yet
             LOGGER.debug("Didn't provide the cookie");
@@ -317,7 +315,7 @@ public class ConcertResource {
 
             em.getTransaction().commit();
 
-            return Response.ok(entity).cookie(new NewCookie(AUTH_COOKIE, cookie.getValue())).build();
+            return Response.ok(entity).cookie(new NewCookie("auth", cookie.getValue())).build();
         } finally {
             em.close();
         }
@@ -393,15 +391,13 @@ public class ConcertResource {
         }
     }
 
-
-    @POST
-    public void notifyConcertInfo(Long concertID, int numOfBookedSeats, LocalDateTime date) {
-        List<Subscription> subs = subscribersMap.get(concertID);
+    public void notifyConcertInfo(BookingRequestDTO dto, int numOfBookedSeats) {
+        List<Subscription> subs = subscribersMap.get(dto.getConcertId());
 
         if(subs != null) { //Make sure the concertID is valid
             List<Subscription> subs2 = new ArrayList<>();
             for(Subscription sub:subs) {
-                if((sub.getDto().getDate().equals(date)) //Make sure the date is valid
+                if((sub.getDto().getDate().equals(dto.getDate())) //Make sure the date is valid
                         && (sub.getDto().getPercentageBooked() < (100 * numOfBookedSeats / TheatreLayout.NUM_SEATS_IN_THEATRE))) {
                         AsyncResponse response = sub.getResponse();
                         int numOfAvaliableSeats = TheatreLayout.NUM_SEATS_IN_THEATRE - numOfBookedSeats;
@@ -415,12 +411,12 @@ public class ConcertResource {
                 }
             }
             //Renew the subscriber
-            subscribersMap.put(concertID, subs2);
+            subscribersMap.put(dto.getConcertId(), subs2);
         }
 
     }
 
-    //===========HELP METHODS =========
+    //=========== HELP METHODS =========
     public User getAuthenticatedUser(EntityManager em, Cookie cookie) {
         TypedQuery<User> userQuery = em.createQuery("select u from User u where u.cookie = :cookie", User.class)
                 .setParameter("cookie", cookie.getValue());
