@@ -13,7 +13,10 @@ public class Seat {
 	private boolean isBooked;
 	private LocalDateTime date;
 	private BigDecimal price;
-	
+
+	@Version
+	private Long version;
+
 	public Seat() {}
 
 	public Seat(String label, boolean isBooked, LocalDateTime date, BigDecimal price) {
@@ -62,4 +65,5 @@ public class Seat {
 	public void setPrice(BigDecimal price) {
 		this.price = price;
 	}
+
 }
