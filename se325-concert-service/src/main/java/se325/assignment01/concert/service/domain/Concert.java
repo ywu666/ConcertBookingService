@@ -33,8 +33,7 @@ public class Concert {
     private Set<LocalDateTime> dates;
 
     @ManyToMany(cascade = CascadeType.PERSIST)
-    @org.hibernate.annotations.Fetch(
-            org.hibernate.annotations.FetchMode.SUBSELECT)
+    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
     @JoinTable(name = "CONCERT_PERFORMER",
             joinColumns = @JoinColumn(name="CONCERT_ID", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "PERFORMER_ID", referencedColumnName = "id"))

@@ -13,9 +13,8 @@ public class Booking {
     private long concertId;
     private LocalDateTime date;
 
-    @ManyToMany(cascade = CascadeType.PERSIST, fetch = FetchType.LAZY)
-    @org.hibernate.annotations.Fetch(
-            org.hibernate.annotations.FetchMode.SUBSELECT)
+    @ManyToMany(cascade = CascadeType.PERSIST)
+    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
     private List<Seat> seats;
 
     @ManyToOne

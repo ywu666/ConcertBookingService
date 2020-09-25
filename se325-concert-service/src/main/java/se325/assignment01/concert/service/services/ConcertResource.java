@@ -36,6 +36,7 @@ public class ConcertResource {
     public Response getConcertById(@PathParam("id") Long id) {
         LOGGER.info("Receiving a concert with id " + id);
         EntityManager em = PersistenceManager.instance().createEntityManager();
+
         try {
             em.getTransaction().begin();
 
@@ -63,12 +64,13 @@ public class ConcertResource {
         try {
             em.getTransaction().begin();
 
-            List<Concert> concertList = em.createQuery("select c from Concert c", Concert.class).getResultList();
+            List<Concert> concertList = em.createQuery("select c from Concert c", Concert.class)
+                    .getResultList();
             List<ConcertDTO> concertDTOList = ConcertMapper.listToDTO(concertList);
-            GenericEntity<List<ConcertDTO>> entity = new GenericEntity<>(concertDTOList) {};
 
             em.getTransaction().commit();
 
+            GenericEntity<List<ConcertDTO>> entity = new GenericEntity<>(concertDTOList) {};
             return Response.ok(entity).build();
         } finally {
             em.close();
@@ -81,15 +83,17 @@ public class ConcertResource {
     public Response getConcertSummaries() {
         LOGGER.info("Getting the concert summaries.");
         EntityManager em = PersistenceManager.instance().createEntityManager();
+
         try {
             em.getTransaction().begin();
 
-            List<Concert> concerts = em.createQuery("select c from Concert c", Concert.class).getResultList();
+            List<Concert> concerts = em.createQuery("select c from Concert c", Concert.class)
+                    .getResultList();
             List<ConcertSummaryDTO> concertSummaryDTOList = ConcertMapper.listToConcertSummaryDTO(concerts);
-            GenericEntity<List<ConcertSummaryDTO>> entity =  new GenericEntity<>(concertSummaryDTOList) {};
 
             em.getTransaction().commit();
 
+            GenericEntity<List<ConcertSummaryDTO>> entity =  new GenericEntity<>(concertSummaryDTOList) {};
             return Response.ok(entity).build();
         } finally {
 
@@ -101,8 +105,8 @@ public class ConcertResource {
     @Path("/performers/{id}")
     public Response getPerformerById(@PathParam("id") Long id) {
         LOGGER.info("Getting a performer of id " + id);
-
         EntityManager em = PersistenceManager.instance().createEntityManager();
+
         try {
             em.getTransaction().begin();
 
@@ -134,13 +138,12 @@ public class ConcertResource {
 
             List<Performer> performers = em.createQuery("select performer from Performer performer", Performer.class).getResultList();
             List<PerformerDTO> performerDTOList = PerformerMapper.listToDTO(performers);
-            GenericEntity<List<PerformerDTO>> entity = new GenericEntity<>(performerDTOList) {};
 
             em.getTransaction().commit();
 
+            GenericEntity<List<PerformerDTO>> entity = new GenericEntity<>(performerDTOList) {};
             return Response.ok(entity).build();
         } finally {
-
             em.close();
         }
     }
@@ -153,22 +156,23 @@ public class ConcertResource {
         EntityManager em = PersistenceManager.instance().createEntityManager();
         try {
             em.getTransaction().begin();
-            TypedQuery<User> queryForUser = em.createQuery("select user from User user where user.username = :username AND user.password = :password", User.class)
-                    .setParameter("username", userDTO.getUsername())
-                    .setParameter("password", userDTO.getPassword());
 
-            List<User> users = queryForUser.getResultList();
+            List<User> users  = em.createQuery("select user from User user where user.username = :username AND user.password = :password", User.class)
+                    .setParameter("username", userDTO.getUsername())
+                    .setParameter("password", userDTO.getPassword())
+                    .getResultList();
 
             if (users.isEmpty()) { //The username is not found or the password is incorrect
                 return Response.status(Response.Status.UNAUTHORIZED).build();
             } else {
-                User user = users.get(0); //Get the users
-                String token = UUID.randomUUID().toString();
+                User user = users.get(0); //Get the user
+                String token = UUID.randomUUID().toString(); //Generate the new token
                 user.setCookie(token);
                 em.merge(user);
 
                 em.getTransaction().commit();
 
+                //Send the cookie back to the client
                 return Response.ok().cookie(new NewCookie("auth", token)).build();
             }
         } finally {
@@ -182,6 +186,7 @@ public class ConcertResource {
         LOGGER.info("Try to make a booing of concert" + dto.getConcertId() + "on Date" + dto.getDate());
 
         if (cookie == null) { //Haven't login
+            LOGGER.debug("Didn't provide the cookie");
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
@@ -195,16 +200,13 @@ public class ConcertResource {
                 return Response.status(Response.Status.UNAUTHORIZED).build();
             }
 
-
             Concert concert = em.find(Concert.class, dto.getConcertId());
 
-            if (concert == null) { // No concert
+            //Invalid the concert and valid concert with invalid dates
+            if (concert == null || !concert.getDates().contains(dto.getDate())) {
                 return Response.status(Response.Status.BAD_REQUEST).build();
             }
 
-            if (!concert.getDates().contains(dto.getDate())) { //The date is wrong
-                return Response.status(Response.Status.BAD_REQUEST).build();
-            }
 
             // one query to get all requested seats
             List<Seat> seats = em.createQuery("select s from Seat s where s.date = :dates and s.isBooked = false and s.label in :seats", Seat.class)
@@ -227,6 +229,7 @@ public class ConcertResource {
 
             int numOfBookedSeats = seatsList.size();
 
+            //Set the booking
             Booking newBooking = new Booking(dto.getConcertId(), dto.getDate(), seats, user);
             em.persist(newBooking);
 
@@ -244,10 +247,12 @@ public class ConcertResource {
     public Response getOwnBookingsById(@PathParam("id") Long id, @CookieParam(AUTH_COOKIE) Cookie cookie){
 
         if (cookie == null) { //Haven't login
+            LOGGER.debug("Didn't provide the cookie");
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
         EntityManager em = PersistenceManager.instance().createEntityManager();
+
         try {
             em.getTransaction().begin();
 
@@ -257,13 +262,15 @@ public class ConcertResource {
                 return Response.status(Response.Status.UNAUTHORIZED).build();
             }
 
-            Booking booking = em.find(Booking.class, id);
+            Booking booking = em.find(Booking.class, id); //Find the booking of that id
 
             if (booking == null) { //Didn't have bookings
+                LOGGER.debug("No booking of id " + id);
                 return Response.status(Response.Status.NOT_FOUND).build();
             }
 
             if (booking.getUser().getId() != user.getId()) { //Check if belongs to mine
+                LOGGER.debug("The booking is from others.");
                 return Response.status(Response.Status.FORBIDDEN).build();
             }
 
@@ -283,6 +290,7 @@ public class ConcertResource {
         LOGGER.info("Get all the bookings for user");
 
         if (cookie == null) { //User hasn't login yet
+            LOGGER.debug("Didn't provide the cookie");
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
 
@@ -334,8 +342,9 @@ public class ConcertResource {
                 }
             }
 
-            List<SeatDTO> seatDTOList = SeatMapper.listToDTO(seats);
-            GenericEntity<List<SeatDTO>> entity = new GenericEntity<>(seatDTOList) {};
+            em.getTransaction().commit();
+
+            GenericEntity<List<SeatDTO>> entity = new GenericEntity<>(SeatMapper.listToDTO(seats)) {};
             return Response.ok(entity).build();
         } finally {
             em.close();
@@ -355,6 +364,7 @@ public class ConcertResource {
         EntityManager em = PersistenceManager.instance().createEntityManager();
         try {
             em.getTransaction().begin();
+
             User user = this.getAuthenticatedUser(em, cookie);
 
             if (user == null) {
@@ -364,16 +374,12 @@ public class ConcertResource {
 
             Concert concert = em.find(Concert.class, dto.getConcertId());
 
-            if (concert == null) { // No concert
+            if (concert == null || !concert.getDates().contains(dto.getDate())) { // No concert
                 response.resume(Response.status(Response.Status.BAD_REQUEST).build());
                 return;
             }
 
-            if (!concert.getDates().contains(dto.getDate())) { //The date is wrong
-                response.resume(Response.status(Response.Status.BAD_REQUEST).build());
-                return;
-            }
-
+            //Renew the subscribers map
             List<Subscription> subscribers = subscribersMap.getOrDefault(concert.getId(), new ArrayList<>());
             subscribers.add(new Subscription(dto, response));
             subscribersMap.put(concert.getId(),subscribers);
@@ -391,7 +397,7 @@ public class ConcertResource {
             List<Subscription> subs2 = new ArrayList<>();
             for(Subscription sub:subs) {
                 if((sub.getDto().getDate().equals(date))
-                        && (sub.getDto().getPercentageBooked() < (100 * numOfBookedSeats/ TheatreLayout.NUM_SEATS_IN_THEATRE))) {
+                        && (sub.getDto().getPercentageBooked() < (100 * numOfBookedSeats / TheatreLayout.NUM_SEATS_IN_THEATRE))) {
                         AsyncResponse response = sub.getResponse();
                         int numOfAvaliableSeats = TheatreLayout.NUM_SEATS_IN_THEATRE - numOfBookedSeats;
 
@@ -417,7 +423,8 @@ public class ConcertResource {
         List<User> users = userQuery.getResultList();
 
         if (users == null) { //Haven't sign up
-           return null;
+            LOGGER.debug("Didn't find the user with cookie.");
+            return null;
         }
 
         LOGGER.info("Login successful");

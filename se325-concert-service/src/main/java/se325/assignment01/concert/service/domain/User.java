@@ -29,13 +29,6 @@ public class User {
     public User(){
     }
 
-    public User(Long id, String username, String password, Long version){
-        this.id = id;
-        this.username = username;
-        this.password = password;
-        this.version = version;
-    }
-
     public Long getId() {
         return id;
     }
