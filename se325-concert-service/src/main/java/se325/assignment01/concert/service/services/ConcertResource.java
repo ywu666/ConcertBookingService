@@ -239,7 +239,7 @@ public class ConcertResource {
 
             em.getTransaction().commit();
 
-            this.notifyConcertInfo(dto, numOfBookedSeats);
+            this.notifyInfoToUser(dto, numOfBookedSeats);
             return Response.created(URI.create("concert-service/bookings/" + newBooking.getId()))
                     .cookie(new NewCookie("auth", cookie.getValue())).build();
         } finally {
@@ -395,29 +395,33 @@ public class ConcertResource {
         }
     }
 
-    public void notifyConcertInfo(BookingRequestDTO dto, int numOfBookedSeats) {
+    public void notifyInfoToUser(BookingRequestDTO dto, int numOfBookedSeats) {
         List<Subscription> subs = subscribersMap.get(dto.getConcertId());
 
-        if(subs != null) { //Make sure the concertID is valid
-            List<Subscription> subs2 = new ArrayList<>();
+        if(subs != null) { //Make sure the concert id id valid
+            List<Subscription> newSubs = new ArrayList<>();
             int numOfAvaliableSeats = TheatreLayout.NUM_SEATS_IN_THEATRE - numOfBookedSeats;
 
+            //Store all the matching subs into the new list
             for(Subscription sub:subs) {
                 if( (sub.getDto().getDate().equals(dto.getDate()))
                         && (this.calPercentage(numOfBookedSeats) > sub.getDto().getPercentageBooked())) {
-                        AsyncResponse response = sub.getResponse();
-
-                        synchronized (response) {
-                            ConcertInfoNotificationDTO notification = new ConcertInfoNotificationDTO(numOfAvaliableSeats);
-                            response.resume(Response.ok(notification).build());
-                        }
-                } else {
-                    subs2.add(sub);
+                    newSubs.add(sub);
                 }
             }
-            subscribersMap.put(dto.getConcertId(), subs2);
-        }
 
+            //Post the information to the user
+            synchronized (subs) {
+                for(Subscription sub:newSubs) {
+                    ConcertInfoNotificationDTO notification = new ConcertInfoNotificationDTO(numOfAvaliableSeats);
+                    sub.getResponse().resume(Response.ok(notification).build());
+                    subs.remove(sub);
+                }
+            }
+
+            //Renew the map
+            subscribersMap.put(dto.getConcertId(), subs);
+        }
     }
 
     //=========== HELP METHODS =========
