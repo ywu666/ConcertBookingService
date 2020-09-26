@@ -15,7 +15,6 @@ import se325.assignment01.concert.service.util.TheatreLayout;
 
 import javax.persistence.EntityManager;
 import javax.persistence.LockModeType;
-import javax.persistence.TypedQuery;
 import javax.ws.rs.*;
 import javax.ws.rs.container.AsyncResponse;
 import javax.ws.rs.container.Suspended;
@@ -68,6 +67,7 @@ public class ConcertResource {
                     .getResultList();
 
             em.getTransaction().commit();
+
             List<ConcertDTO> concertDTOList = ConcertMapper.listToDTO(concertList);
             GenericEntity<List<ConcertDTO>> entity = new GenericEntity<>(concertDTOList) {};
             return Response.ok(entity).build();
@@ -90,6 +90,7 @@ public class ConcertResource {
                     .getResultList();
 
             em.getTransaction().commit();
+
             List<ConcertSummaryDTO> dtos = ConcertMapper.listToConcertSummaryDTO(concerts);
             GenericEntity<List<ConcertSummaryDTO>> entity =  new GenericEntity<>(dtos) {};
             return Response.ok(entity).build();
@@ -139,8 +140,8 @@ public class ConcertResource {
 
             em.getTransaction().commit();
 
-            List<PerformerDTO> performerDTOList = PerformerMapper.listToDTO(performers);
-            GenericEntity<List<PerformerDTO>> entity = new GenericEntity<>(performerDTOList) {};
+            List<PerformerDTO> dtos = PerformerMapper.listToDTO(performers);
+            GenericEntity<List<PerformerDTO>> entity = new GenericEntity<>(dtos) {};
             return Response.ok(entity).build();
         } finally {
             em.close();
@@ -157,7 +158,7 @@ public class ConcertResource {
         try {
             em.getTransaction().begin();
 
-            List<User> users  = em.createQuery("select user from User user where user.username = :username AND user.password = :password", User.class)
+            List<User> users  = em.createQuery("select user from User user where user.username = :username and user.password = :password", User.class)
                     .setParameter("username", userDTO.getUsername())
                     .setParameter("password", userDTO.getPassword())
                     .getResultList();
@@ -166,7 +167,7 @@ public class ConcertResource {
                 return Response.status(Response.Status.UNAUTHORIZED).build();
             } else {
                 User user = users.get(0); //Get the user
-                String token = UUID.randomUUID().toString(); //Generate the new token
+                String token = UUID.randomUUID().toString(); //Generate the token
                 user.setCookie(token);
                 em.merge(user);
 
@@ -183,7 +184,8 @@ public class ConcertResource {
     @POST
     @Path("/bookings")
     public Response makeABooking(BookingRequestDTO dto, @CookieParam("auth") Cookie cookie) {
-        LOGGER.info("Try to make a booing of concert" + dto.getConcertId() + "on Date" + dto.getDate());
+        LOGGER.info("Try to make a booing of concert " + dto.getConcertId()
+                + "on Date " + dto.getDate());
 
         if (cookie == null) { //Haven't login
             LOGGER.debug("Didn't provide the cookie");
@@ -208,10 +210,10 @@ public class ConcertResource {
             }
 
             //Get all the requested seats and set the lock to prevent the concurrent booking
-            List<Seat> seats = em.createQuery("select s from Seat s where s.date = :dates and s.isBooked = false and s.label in :seats", Seat.class)
-                    .setParameter("seats", dto.getSeatLabels())
-                    .setParameter("dates", dto.getDate())
+            List<Seat> seats = em.createQuery("select s from Seat s where s.date = :date and s.isBooked = false and s.label in :seats", Seat.class)
                     .setLockMode(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+                    .setParameter("seats", dto.getSeatLabels())
+                    .setParameter("date", dto.getDate())
                     .getResultList();
 
             //At least one seat is already booked
@@ -315,7 +317,8 @@ public class ConcertResource {
 
             em.getTransaction().commit();
 
-            return Response.ok(entity).cookie(new NewCookie("auth", cookie.getValue())).build();
+            return Response.ok(entity)
+                    .cookie(new NewCookie("auth", cookie.getValue())).build();
         } finally {
             em.close();
         }
@@ -337,10 +340,9 @@ public class ConcertResource {
                             .setParameter("date", date)
                             .getResultList();
                 } else { //Getting booked or unbooked seats
-                    boolean isBooked = (status == BookingStatus.Booked);
-                    seats = em.createQuery("select seat from Seat seat where seat.date = :date AND seat.isBooked = :isBooked ",Seat.class)
+                    seats = em.createQuery("select seat from Seat seat where seat.date = :date and seat.isBooked = :isBooked ",Seat.class)
                             .setParameter("date", date)
-                            .setParameter("isBooked", isBooked)
+                            .setParameter("isBooked", status == BookingStatus.Booked)
                             .getResultList();
                 }
             }
@@ -356,11 +358,11 @@ public class ConcertResource {
 
     @POST
     @Path("/subscribe/concertInfo")
-    public void subscriptConcertInfo(@CookieParam("auth") Cookie cookie, ConcertInfoSubscriptionDTO dto, @Suspended AsyncResponse response) {
+    public void subscriptConcertInfo(@CookieParam("auth") Cookie cookie, ConcertInfoSubscriptionDTO dto, @Suspended AsyncResponse sub) {
         LOGGER.info("Attempting to subscribe");
 
         if(cookie == null) {
-            response.resume(Response.status(Response.Status.UNAUTHORIZED).build());
+            sub.resume(Response.status(Response.Status.UNAUTHORIZED).build());
             return;
         }
 
@@ -371,20 +373,22 @@ public class ConcertResource {
             User user = this.getAuthenticatedUser(em, cookie);
 
             if (user == null) {
-                response.resume(Response.status(Response.Status.UNAUTHORIZED).build());
+                sub.resume(Response.status(Response.Status.UNAUTHORIZED).build());
                 return;
             }
 
             Concert concert = em.find(Concert.class, dto.getConcertId());
 
             if (concert == null || !concert.getDates().contains(dto.getDate())) {
-                response.resume(Response.status(Response.Status.BAD_REQUEST).build());
+                sub.resume(Response.status(Response.Status.BAD_REQUEST).build());
                 return;
             }
 
+            em.getTransaction().commit();
+
             //Renew the subscribers map
             List<Subscription> subscribers = subscribersMap.getOrDefault(concert.getId(), new ArrayList<>());
-            subscribers.add(new Subscription(dto, response));
+            subscribers.add(new Subscription(dto, sub));
             subscribersMap.put(concert.getId(), subscribers);
         } finally {
             em.close();
@@ -396,11 +400,12 @@ public class ConcertResource {
 
         if(subs != null) { //Make sure the concertID is valid
             List<Subscription> subs2 = new ArrayList<>();
+            int numOfAvaliableSeats = TheatreLayout.NUM_SEATS_IN_THEATRE - numOfBookedSeats;
+
             for(Subscription sub:subs) {
-                if((sub.getDto().getDate().equals(dto.getDate())) //Make sure the date is valid
-                        && (sub.getDto().getPercentageBooked() < (100 * numOfBookedSeats / TheatreLayout.NUM_SEATS_IN_THEATRE))) {
+                if( (sub.getDto().getDate().equals(dto.getDate()))
+                        && (sub.getDto().getPercentageBooked() < this.calPercentage(numOfBookedSeats))) {
                         AsyncResponse response = sub.getResponse();
-                        int numOfAvaliableSeats = TheatreLayout.NUM_SEATS_IN_THEATRE - numOfBookedSeats;
 
                         synchronized (response) {
                             ConcertInfoNotificationDTO notification = new ConcertInfoNotificationDTO(numOfAvaliableSeats);
@@ -410,7 +415,6 @@ public class ConcertResource {
                     subs2.add(sub);
                 }
             }
-            //Renew the subscriber
             subscribersMap.put(dto.getConcertId(), subs2);
         }
 
@@ -418,10 +422,9 @@ public class ConcertResource {
 
     //=========== HELP METHODS =========
     public User getAuthenticatedUser(EntityManager em, Cookie cookie) {
-        TypedQuery<User> userQuery = em.createQuery("select u from User u where u.cookie = :cookie", User.class)
-                .setParameter("cookie", cookie.getValue());
-
-        List<User> users = userQuery.getResultList();
+        List<User> users = em.createQuery("select u from User u where u.cookie = :cookie", User.class)
+                .setParameter("cookie", cookie.getValue())
+                .getResultList();
 
         if (users == null) { //Haven't sign up
             LOGGER.debug("Didn't find the user with cookie.");
@@ -433,4 +436,7 @@ public class ConcertResource {
         return user;
     }
 
+    public int calPercentage(int numOfBookedSeats) {
+       return ( 100 * numOfBookedSeats / TheatreLayout.NUM_SEATS_IN_THEATRE);
+    }
 }
