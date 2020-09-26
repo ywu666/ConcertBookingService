@@ -211,7 +211,7 @@ public class ConcertResource {
 
             //Get all the requested seats and set the lock to prevent the concurrent booking
             List<Seat> seats = em.createQuery("select s from Seat s where s.date = :date and s.isBooked = false and s.label in :seats", Seat.class)
-                    .setLockMode(LockModeType.OPTIMISTIC_FORCE_INCREMENT)
+                    .setLockMode(LockModeType.OPTIMISTIC)
                     .setParameter("seats", dto.getSeatLabels())
                     .setParameter("date", dto.getDate())
                     .getResultList();
@@ -404,7 +404,7 @@ public class ConcertResource {
 
             for(Subscription sub:subs) {
                 if( (sub.getDto().getDate().equals(dto.getDate()))
-                        && (sub.getDto().getPercentageBooked() < this.calPercentage(numOfBookedSeats))) {
+                        && (this.calPercentage(numOfBookedSeats) > sub.getDto().getPercentageBooked())) {
                         AsyncResponse response = sub.getResponse();
 
                         synchronized (response) {
