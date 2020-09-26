@@ -226,12 +226,12 @@ public class ConcertResource {
             }
 
             //Get all the booked seats
-            List<Seat> seatsList = em.createQuery("select s from Seat s where s.date = :date and s.isBooked = true ", Seat.class)
+            List<Seat> bookedSeatsList = em.createQuery("select s from Seat s where s.date = :date and s.isBooked = true ", Seat.class)
                     .setParameter("date", dto.getDate())
                     .getResultList();
 
             //Get the number of booked seats
-            int numOfBookedSeats = seatsList.size();
+            int numOfBookedSeats = bookedSeatsList.size();
 
             //Set the booking
             Booking newBooking = new Booking(dto.getConcertId(), dto.getDate(), seats, user);
