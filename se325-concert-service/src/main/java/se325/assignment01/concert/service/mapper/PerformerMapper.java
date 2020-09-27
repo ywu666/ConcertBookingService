@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Mapper class to convert from domain-model to DTO objects representing Performers.
+ */
 public class PerformerMapper {
     public static PerformerDTO toDTO(Performer performer) {
         return new PerformerDTO(performer.getId(), performer.getName(), performer.getImageName(), performer.getGenre(), performer.getBlurb());

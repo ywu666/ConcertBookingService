@@ -4,6 +4,9 @@ import javax.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Domain class represent the seat in the concert.
+ */
 @Entity
 public class Seat {
 	@Id

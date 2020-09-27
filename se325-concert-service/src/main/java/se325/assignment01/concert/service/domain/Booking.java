@@ -4,7 +4,10 @@ import javax.persistence.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
-
+/**
+ * Domain class for representing a concert booking.
+ * It will store the concert id and the seats are booked and the user who book this seat.
+ */
 @Entity
 public class Booking {
     @Id
@@ -14,7 +17,8 @@ public class Booking {
     private LocalDateTime date;
 
     @ManyToMany(cascade = CascadeType.PERSIST)
-    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
+    @org.hibernate.annotations.Fetch(
+            org.hibernate.annotations.FetchMode.SUBSELECT)
     private List<Seat> seats;
 
     @ManyToOne

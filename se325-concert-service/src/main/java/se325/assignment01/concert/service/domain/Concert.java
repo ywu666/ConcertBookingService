@@ -9,6 +9,9 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 
 
+/**
+ * Domain class represents the concert.
+ */
 @Entity
 @Table(name = "CONCERTS")
 public class Concert {
@@ -33,7 +36,8 @@ public class Concert {
     private Set<LocalDateTime> dates;
 
     @ManyToMany(cascade = CascadeType.PERSIST)
-    @org.hibernate.annotations.Fetch(org.hibernate.annotations.FetchMode.SUBSELECT)
+    @org.hibernate.annotations.Fetch(
+            org.hibernate.annotations.FetchMode.SUBSELECT)
     @JoinTable(name = "CONCERT_PERFORMER",
             joinColumns = @JoinColumn(name="CONCERT_ID", referencedColumnName = "id"),
             inverseJoinColumns = @JoinColumn(name = "PERFORMER_ID", referencedColumnName = "id"))
@@ -100,8 +104,10 @@ public class Concert {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof Concert)) return false;
         if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
 
         Concert concert = (Concert) obj;
 

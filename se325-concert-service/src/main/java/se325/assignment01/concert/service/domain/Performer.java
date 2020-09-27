@@ -7,6 +7,9 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import se325.assignment01.concert.common.types.Genre;
 
+/**
+ * Domain class represents the performers.
+ */
 @Entity
 @Table(name = "PERFORMERS")
 public class Performer{
@@ -84,9 +87,10 @@ public class Performer{
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof Performer)) return false;
-
         if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
 
         Performer performer = (Performer) obj;
 

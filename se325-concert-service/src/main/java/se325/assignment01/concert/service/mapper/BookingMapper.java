@@ -7,6 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Mapper class to convert from domain-model to DTO objects representing
+ * Bookings.
+ */
 public class BookingMapper {
     public static BookingDTO toDTO(Booking booking){
         return new BookingDTO(booking.getConcertId(), booking.getDate(),

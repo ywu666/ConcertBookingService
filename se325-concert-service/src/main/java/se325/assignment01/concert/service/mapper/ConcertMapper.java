@@ -7,6 +7,9 @@ import se325.assignment01.concert.service.domain.Concert;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Mapper class to convert from domain-model to DTO objects representing Concert.
+ */
 public class ConcertMapper {
     public static ConcertDTO toDTO(Concert concert){
         ConcertDTO result = new ConcertDTO(concert.getId(),concert.getTitle(),concert.getImageName(),concert.getBlurb());

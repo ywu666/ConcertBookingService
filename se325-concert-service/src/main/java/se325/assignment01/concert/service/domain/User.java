@@ -5,6 +5,9 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 
 import javax.persistence.*;
 
+/**
+ * Domain class represent the user of theater.
+ */
 @Entity
 @Table(name = "USERS")
 public class User {
@@ -63,8 +66,10 @@ public class User {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof Concert)) return false;
         if (obj == this) return true;
+        if (obj == null || obj.getClass() != this.getClass()) {
+            return false;
+        }
 
         User user = (User) obj;
         return new EqualsBuilder().append(username, user.username).isEquals();
